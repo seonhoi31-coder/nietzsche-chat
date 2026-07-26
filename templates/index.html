@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>니체와의 대화</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Georgia', serif;
+            background-color: #faf7f2;
+            color: #2b2b2b;
+        }
+
+        #sidebar {
+            background-color: #f0ebe1;
+            width: 220px;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        #new-chat-button {
+            width: 100%;
+            padding: 10px;
+            background-color: #d8cdb8;
+            color:#2b2b2b;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #new-chat-button:hover {
+            background-color: #c9bda3;
+        }
+
+        #chat-list div {
+            padding: 8px;
+            margin-top: 6px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        #chat-list div:hover {
+            background-color: #e4dcc9;
+        }
+
+        h1 {
+            font-size: 22px;
+            border-bottom: 1px solid #ddd2ba;
+            padding-bottom: 10px;
+        }
+
+        #chat-box {
+            min-height: 60vh;
+            padding: 10px 0;
+        }
+
+        #chat-box p {
+            padding: 10px 14px;
+            border-radius: 10px;
+            max-width: 70%;
+            line-height: 1.5;
+        }
+
+        #user-input {
+            width: 70%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background-color: white;
+            color: #2b2b2b;
+        }
+
+        #send-button {
+            padding: 10px 16px;
+            background-color: #8a7a5c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        #send-button:hover {
+            background-color: #75674d;
+        }
+    </style>
+</head>
+<body>
+    <div style="display: flex;">
+
+        <div id="sidebar" style="width: 200px; border-right: 1px solid #ccc; padding: 10px; height: 100vh;">
+            <button id="new-chat-button">+ 새 대화</button>
+            <div id="chat-list" style="margin-top: 10px;"></div>
+        </div>
+
+        <div style="flex: 1; padding: 20px;">
+            <h1>니체와의 대화</h1>
+            <div id="chat-box"></div>
+            <input type="text" id="user-input" placeholder="니체에게 말을 걸어보세요">
+            <button id="send-button">전송</button>
+        </div>
+
+    </div>
+
+    <script>
+    const sendButton = document.getElementById("send-button");
+    const userInput = document.getElementById("user-input");
+    const chatBox = document.getElementById("chat-box");
+    const newChatButton = document.getElementById("new-chat-button");
+    const chatList = document.getElementById("chat-list");
+
+    // 모든 대화들을 저장해둘 큰 상자 (없으면 빈 상자로 시작)
+    let allChats = JSON.parse(localStorage.getItem("all-chats")) || {};
+    let currentChatId = null;
+
+    // 저장하는 함수: 지금 상태를 브라우저에 기록
+    function saveChats() {
+        localStorage.setItem("all-chats", JSON.stringify(allChats));
+    }
+
+    // 왼쪽 목록을 다시 그리는 함수
+    function renderSidebar() {
+        chatList.innerHTML = "";
+        for (const id in allChats) {
+            const item = document.createElement("div");
+            item.textContent = allChats[id].title;
+            item.style.cursor = "pointer";
+            item.style.padding = "5px";
+            item.addEventListener("click", function() {
+                switchChat(id);
+            });
+            chatList.appendChild(item);
+        }
+    }
+
+    // 특정 대화로 화면을 바꾸는 함수
+    function switchChat(id) {
+        currentChatId = id;
+        chatBox.innerHTML = "";
+        allChats[id].messages.forEach(function(msg) {
+            chatBox.innerHTML += "<p><b>" + msg.sender + ":</b> " + msg.text + "</p>";
+        });
+    }
+
+    // 완전히 새로운 대화를 만드는 함수
+    function createNewChat() {
+        const id = "chat-" + Date.now();
+        allChats[id] = { title: "새 대화", messages: [] };
+        saveChats();
+        renderSidebar();
+        switchChat(id);
+    }
+
+    // 전송 버튼
+    sendButton.addEventListener("click", function() {
+        const message = userInput.value;
+        if (!message) return;
+
+        // 이 대화의 첫 메시지라면, 그 메시지를 제목으로 사용
+        if (allChats[currentChatId].messages.length === 0) {
+            allChats[currentChatId].title = message.slice(0, 15);
+        }
+
+        allChats[currentChatId].messages.push({ sender: "나", text: message });
+        chatBox.innerHTML += "<p><b>나:</b> " + message + "</p>";
+        userInput.value = "";
+        chatBox.innerHTML += "<p id='loading'><b>니체:</b> <i>생각 중...</i></p>";
+        saveChats();
+        renderSidebar();
+
+        fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: message })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("loading").remove();
+            chatBox.innerHTML += "<p><b>니체:</b> " + data.reply + "</p>";
+            allChats[currentChatId].messages.push({ sender: "니체", text: data.reply });
+            saveChats();
+        });
+    });
+
+    // 새 대화 버튼
+    newChatButton.addEventListener("click", function() {
+        createNewChat();
+    });
+
+    // 페이지 처음 열렸을 때: 기존 대화 있으면 보여주고, 없으면 새로 만들기
+    if (Object.keys(allChats).length === 0) {
+        createNewChat();
+    } else {
+        renderSidebar();
+        const firstId = Object.keys(allChats)[0];
+        switchChat(firstId);
+    }
+    </script>
+</body>
+</html>

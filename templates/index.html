@@ -120,18 +120,55 @@
 
     // 왼쪽 목록을 다시 그리는 함수
     function renderSidebar() {
-        chatList.innerHTML = "";
-        for (const id in allChats) {
-            const item = document.createElement("div");
-            item.textContent = allChats[id].title;
-            item.style.cursor = "pointer";
-            item.style.padding = "5px";
-            item.addEventListener("click", function() {
-                switchChat(id);
-            });
-            chatList.appendChild(item);
+    chatList.innerHTML = "";
+    for (const id in allChats) {
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.justifyContent = "space-between";
+        wrapper.style.alignItems = "center";
+        wrapper.style.padding = "5px";
+
+        const item = document.createElement("span");
+        item.textContent = allChats[id].title;
+        item.style.cursor = "pointer";
+        item.addEventListener("click", function() {
+            switchChat(id);
+        });
+
+        const deleteBtn = document.createElement("span");
+        deleteBtn.textContent = "✕";
+        deleteBtn.style.cursor = "pointer";
+        deleteBtn.style.color = "#999";
+        deleteBtn.style.marginLeft = "8px";
+        deleteBtn.addEventListener("click", function(event) {
+            event.stopPropagation();
+            deleteChat(id);
+        });
+
+        wrapper.appendChild(item);
+        wrapper.appendChild(deleteBtn);
+        chatList.appendChild(wrapper);
+    }
+}
+
+function deleteChat(id) {
+    const confirmDelete = confirm("이 대화를 삭제하시겠습니까?");
+    if (!confirmDelete) return;
+
+    delete allChats[id];
+    saveChats();
+
+    if (currentChatId === id) {
+        const remainingIds = Object.keys(allChats);
+        if (remainingIds.length > 0) {
+            switchChat(remainingIds[0]);
+        } else {
+            createNewChat();
         }
     }
+
+    renderSidebar();
+}
 
     // 특정 대화로 화면을 바꾸는 함수
     function switchChat(id) {
